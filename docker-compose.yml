@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - ./gitea/data:/data
+    ports:
+      - "3000:3000"
+      - "222:22"
+    restart: unless-stopped
+
+  woodpecker-server:
+    image: woodpeckerci/woodpecker-server:latest
+    container_name: woodpecker-server
+    environment:
+      - WOODPECKER_OPEN=true
+      - WOODPECKER_GITEA=true
+      - WOODPECKER_GITEA_URL=http://gitea:3000
+      - WOODPECKER_ADMIN=admin
+      - WOODPECKER_AGENT_SECRET=mysecret123
+      - WOODPECKER_SERVER_ADDR=:8000
+      - WOODPECKER_HOST=http://localhost:8000
+      - WOODPECKER_GITEA_CLIENT=61e8b1d0-e287-4e6e-901b-ea6ef72407d5
+      - WOODPECKER_GITEA_SECRET=gto_mdvplhhww3z5xag7jgb7ndfmuwcrjnapdlcvv35ed3h6mte7xqxa
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./woodpecker/server:/var/lib/woodpecker
+    depends_on:
+      - gitea
+    restart: unless-stopped
+
+  woodpecker-agent:
+    image: woodpeckerci/woodpecker-agent:latest
+    container_name: woodpecker-agent
+    environment:
+      - WOODPECKER_SERVER=http://woodpecker-server:8000
+      - WOODPECKER_AGENT_SECRET=mysecret123
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - woodpecker-server
+    restart: unless-stopped
+
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
